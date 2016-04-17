@@ -3,7 +3,7 @@
 const int PIN_DOOR = 16;
 
 Bounce debouncer = Bounce(); // Bounce is built into Homie, so you can use it without including it first
-unsigned long lastDoorValue = -1;
+int lastDoorValue = -1;
 
 HomieNode doorNode("door", "door");
 
@@ -14,7 +14,7 @@ void loopHandler() {
      Serial.print("Door is now: ");
      Serial.println(doorValue ? "open" : "close");
 
-     if (Homie.setNodeProperty(doorNode, "open", String(doorValue ? "true" : "false"), true)) {
+     if (Homie.setNodeProperty(doorNode, "open", doorValue ? "true" : "false", true)) {
        lastDoorValue = doorValue;
      } else {
        Serial.println("Sending failed");

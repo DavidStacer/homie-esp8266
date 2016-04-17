@@ -1,4 +1,4 @@
-#include "Homie.h"
+#include "Homie.hpp"
 
 using namespace HomieInternals;
 
@@ -23,8 +23,6 @@ HomieClass::HomieClass() : _setup(false) {
 
   Helpers::generateDeviceId();
 
-  Blinker.attachInterface(&this->_interface);
-
   this->_bootNormal.attachInterface(&this->_interface);
   this->_bootOta.attachInterface(&this->_interface);
   this->_bootConfig.attachInterface(&this->_interface);
@@ -33,7 +31,7 @@ HomieClass::HomieClass() : _setup(false) {
 HomieClass::~HomieClass() {
 }
 
-void HomieClass::_checkBeforeSetup(String functionName) {
+void HomieClass::_checkBeforeSetup(const __FlashStringHelper* functionName) {
   if (_setup) {
     Logger.log(F("✖ "));
     Logger.log(functionName);
@@ -43,6 +41,8 @@ void HomieClass::_checkBeforeSetup(String functionName) {
 }
 
 void HomieClass::setup() {
+  Blinker.attachInterface(&this->_interface); // here otherwise in constructor this crashes because Blinker might not be constructed
+
   if (Logger.isEnabled()) {
     Serial.begin(BAUD_RATE);
     Logger.logln();
@@ -66,6 +66,10 @@ void HomieClass::setup() {
         this->_boot = &this->_bootOta;
         Logger.logln(F("Triggering HOMIE_OTA_MODE event..."));
         this->_interface.eventHandler(HOMIE_OTA_MODE);
+        break;
+      default:
+        Logger.logln(F("✖ The boot mode is invalid"));
+        abort();
         break;
     }
   }
@@ -117,7 +121,7 @@ void HomieClass::setBrand(const char* name) {
   strcpy(this->_interface.brand, name);
 }
 
-void HomieClass::registerNode(HomieNode& node) {
+void HomieClass::registerNode(const HomieNode& node) {
   this->_checkBeforeSetup(F("registerNode"));
   if (this->_interface.registeredNodesCount > MAX_REGISTERED_NODES_COUNT) {
     Serial.println(F("✖ register(): the max registered nodes count has been reached"));
@@ -180,7 +184,7 @@ void HomieClass::disableResetTrigger() {
   this->_interface.reset.enabled = false;
 }
 
-bool HomieClass::setNodeProperty(HomieNode& node, const char* property, const char* value, bool retained) {
+bool HomieClass::setNodeProperty(const HomieNode& node, const char* property, const char* value, bool retained) {
   if (!this->isReadyToOperate()) {
     Logger.logln(F("✖ setNodeProperty(): impossible now"));
     return false;

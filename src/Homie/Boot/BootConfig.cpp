@@ -8,7 +8,7 @@ BootConfig::BootConfig()
 , _ssidCount(0)
 , _wifiScanAvailable(false)
 , _lastWifiScanEnded(true)
-, _jsonWifiNetworks(nullptr)
+, _jsonWifiNetworks()
 , _flaggedForReboot(false)
 , _flaggedForRebootAt(0)
 {
@@ -32,13 +32,12 @@ void BootConfig::setup() {
 
   WiFi.mode(WIFI_AP);
 
-  IPAddress apIp(192, 168, 1, 1);
   char apName[MAX_WIFI_SSID_LENGTH];
   strcpy(apName, this->_interface->brand);
   strcat_P(apName, PSTR("-"));
   strcat(apName, Helpers::getDeviceId());
 
-  WiFi.softAPConfig(apIp, apIp, IPAddress(255, 255, 255, 0));
+  WiFi.softAPConfig(ACCESS_POINT_IP, ACCESS_POINT_IP, IPAddress(255, 255, 255, 0));
   WiFi.softAP(apName, deviceId);
 
   Logger.log(F("AP started as "));
@@ -46,11 +45,11 @@ void BootConfig::setup() {
 
   this->_dns.setTTL(300);
   this->_dns.setErrorReplyCode(DNSReplyCode::ServerFailure);
-  this->_dns.start(53, F("homie.config"), apIp);
+  this->_dns.start(53, F("homie.config"), ACCESS_POINT_IP);
 
   this->_http.on("/", HTTP_GET, [this]() {
     Logger.logln(F("Received index request"));
-    this->_http.send(200, F("text/plain"), F("See Configuration API usage: https://github.com/marvinroger/homie-esp8266/wiki/6.-Configuration-API"));
+    this->_http.send(200, F("text/plain"), F("See Configuration API usage: http://marvinroger.viewdocs.io/homie-esp8266/6.-Configuration-API"));
   });
   this->_http.on("/heart", HTTP_GET, [this]() {
     Logger.logln(F("Received heart request"));
@@ -127,7 +126,7 @@ void BootConfig::_onDeviceInfoRequest() {
   JsonArray& nodes = json.createNestedArray("nodes");
   for (int i = 0; i < this->_interface->registeredNodesCount; i++) {
     jsonLength += 20; // {"id":"","type":""},
-    HomieNode* node = this->_interface->registeredNodes[i];
+    const HomieNode* node = this->_interface->registeredNodes[i];
     JsonObject& jsonNode = jsonBuffer.createObject();
     jsonLength += strlen(node->getId());
     jsonNode["id"] = node->getId();
@@ -162,7 +161,7 @@ void BootConfig::_onConfigRequest() {
   }
 
   StaticJsonBuffer<MAX_JSON_CONFIG_ARDUINOJSON_BUFFER_SIZE> parseJsonBuffer;
-  JsonObject& parsedJson = parseJsonBuffer.parseObject((char*)this->_http.arg("plain").c_str());
+  JsonObject& parsedJson = parseJsonBuffer.parseObject((char*)this->_http.arg("plain").c_str()); // do not use plain String, else fails
   if (!parsedJson.success()) {
     Logger.logln(F("✖ Invalid or too big JSON"));
     this->_http.send(400, FPSTR(PROGMEM_CONFIG_APPLICATION_JSON), FPSTR(PROGMEM_CONFIG_JSON_FAILURE));
@@ -221,7 +220,6 @@ void BootConfig::loop() {
     this->_lastWifiScanEnded = true;
   }
 
-  unsigned long now = millis();
   if (this->_lastWifiScanEnded && this->_wifiScanTimer.check()) {
     Logger.logln(F("Triggering Wi-Fi scan..."));
     WiFi.scanNetworks(true);

@@ -9,7 +9,7 @@ BootNormal::BootNormal()
 , _wifiDisconnectNotified(true)
 , _mqttConnectNotified(false)
 , _mqttDisconnectNotified(true)
-, _otaVersion({'\0'})
+, _otaVersion {'\0'}
 , _flaggedForOta(false)
 , _flaggedForReset(false)
 {
@@ -66,7 +66,7 @@ void BootNormal::_mqttConnect() {
       return;
     } else {
       Logger.log(F("✔ "));
-      Logger.log(String(n));
+      Logger.log(n);
       Logger.logln(F(" service(s) found, using first"));
       host = MDNS.IP(0);
       port = MDNS.port(0);
@@ -101,7 +101,7 @@ void BootNormal::_mqttConnect() {
         Logger.logln(F("MQTT_DISCONNECTED"));
         break;
       case MQTT_CONNECTED:
-        Logger.logln(F("MQTT_CONNECTED (???)"));
+        Logger.logln(F("MQTT_CONNECTED (?)"));
         break;
       case MQTT_CONNECT_BAD_PROTOCOL:
         Logger.logln(F("MQTT_CONNECT_BAD_PROTOCOL"));
@@ -133,7 +133,7 @@ void BootNormal::_mqttSetup() {
   char nodes[MAX_REGISTERED_NODES_COUNT * (MAX_NODE_ID_LENGTH + 1 + MAX_NODE_ID_LENGTH + 1) - 1];
   strcpy_P(nodes, PSTR(""));
   for (int i = 0; i < this->_interface->registeredNodesCount; i++) {
-    HomieNode* node = this->_interface->registeredNodes[i];
+    const HomieNode* node = this->_interface->registeredNodes[i];
     strcat(nodes, node->getId());
     strcat_P(nodes, PSTR(":"));
     strcat(nodes, node->getType());
@@ -215,8 +215,8 @@ void BootNormal::_mqttCallback(char* topic, char* payload) {
 
   // Implicit node properties
   unified.remove(unified.length() - 4, 4); // Remove /set
-  int separator;
-  for (int i = 0; i < unified.length(); i++) {
+  unsigned int separator = 0;
+  for (unsigned int i = 0; i < unified.length(); i++) {
     if (unified.charAt(i) == '/') {
       separator = i;
       break;
@@ -227,7 +227,7 @@ void BootNormal::_mqttCallback(char* topic, char* payload) {
 
   int homieNodeIndex = -1;
   for (int i = 0; i < this->_interface->registeredNodesCount; i++) {
-    HomieNode* homieNode = this->_interface->registeredNodes[i];
+    const HomieNode* homieNode = this->_interface->registeredNodes[i];
     if (node == homieNode->getId()) {
       homieNodeIndex = i;
       break;
@@ -241,7 +241,7 @@ void BootNormal::_mqttCallback(char* topic, char* payload) {
     return;
   }
 
-  HomieNode* homieNode = this->_interface->registeredNodes[homieNodeIndex];
+  const HomieNode* homieNode = this->_interface->registeredNodes[homieNodeIndex];
 
   int homieNodePropertyIndex = -1;
   for (int i = 0; i < homieNode->getSubscriptionsCount(); i++) {
@@ -252,15 +252,13 @@ void BootNormal::_mqttCallback(char* topic, char* payload) {
     }
   }
 
-  if (homieNodePropertyIndex == -1) {
+  if (!homieNode->getSubscribeToAll() && homieNodePropertyIndex == -1) {
     Logger.log(F("Node "));
     Logger.log(node);
     Logger.log(F(" not subscribed to "));
     Logger.logln(property);
     return;
   }
-
-  Subscription homieNodeSubscription = homieNode->getSubscriptions()[homieNodePropertyIndex];
 
   Logger.logln(F("Calling global input handler..."));
   bool handled = this->_interface->globalInputHandler(node, property, message);
@@ -270,8 +268,12 @@ void BootNormal::_mqttCallback(char* topic, char* payload) {
   handled = homieNode->getInputHandler()(property, message);
   if (handled) return;
 
-  Logger.logln(F("Calling property input handler..."));
-  handled = homieNodeSubscription.inputHandler(message);
+  if (homieNodePropertyIndex != -1) { // might not if subscribed to all only
+    Subscription homieNodeSubscription = homieNode->getSubscriptions()[homieNodePropertyIndex];
+    Logger.logln(F("Calling property input handler..."));
+    handled = homieNodeSubscription.inputHandler(message);
+  }
+
   if (!handled){
     Logger.logln(F("No handlers handled the following packet:"));
     Logger.log(F("  • Node ID: "));
@@ -316,10 +318,10 @@ void BootNormal::setup() {
   if (Config.get().mqtt.server.ssl.enabled) {
     Logger.log(F("SSL enabled: pushing CPU frequency to 160MHz... "));
     if (system_update_cpu_freq(SYS_CPU_160MHZ)) {
-      Logger.logln("OK");
+      Logger.logln(F("OK"));
     } else {
-      Logger.logln("Failure");
-      Logger.logln("Rebooting...");
+      Logger.logln(F("Failure"));
+      Logger.logln(F("Rebooting..."));
       ESP.restart();
     }
   }
@@ -395,7 +397,6 @@ void BootNormal::loop() {
       this->_mqttDisconnectNotified = true;
     }
 
-    unsigned long now = millis();
     if (this->_mqttReconnectTimer.check()) {
       Logger.logln(F("↕ Attempting to connect to MQTT..."));
       this->_mqttReconnectTimer.tick();
@@ -427,7 +428,6 @@ void BootNormal::loop() {
     this->_setupFunctionCalled = true;
   }
 
-  unsigned long now = millis();
   if (this->_signalQualityTimer.check()) {
     int32_t rssi = WiFi.RSSI();
     unsigned char quality;
@@ -462,7 +462,7 @@ void BootNormal::loop() {
     itoa(Uptime.getSeconds(), uptimeStr, 10);
 
     Logger.log(F("Sending uptime ("));
-    Logger.log(String(Uptime.getSeconds()));
+    Logger.log(Uptime.getSeconds());
     Logger.log(F("s)... "));
 
     this->_fillMqttTopic(PSTR("/$uptime"));

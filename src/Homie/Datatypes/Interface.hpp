@@ -2,8 +2,8 @@
 
 #include "../Limits.hpp"
 #include "./Callbacks.hpp"
-#include "../../HomieNode.h"
-#include "../../HomieEvent.h"
+#include "../../HomieNode.hpp"
+#include "../../HomieEvent.hpp"
 
 namespace HomieInternals {
   struct Interface {
@@ -30,7 +30,7 @@ namespace HomieInternals {
       ResetFunction userFunction;
     } reset;
 
-    HomieNode* registeredNodes[MAX_REGISTERED_NODES_COUNT];
+    const HomieNode* registeredNodes[MAX_REGISTERED_NODES_COUNT];
     unsigned char registeredNodesCount;
 
     GlobalInputHandler globalInputHandler;
